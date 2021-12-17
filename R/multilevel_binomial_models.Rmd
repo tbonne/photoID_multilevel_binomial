@@ -1,0 +1,321 @@
+---
+title: "Simulation tests of multinomial models for use with photo ID data"
+output: html_notebook
+---
+
+Introduction:
+
+ Photo identification of individuals within a population is a common data source that is becoming more common given technological advances and the use of computer vision and machine learning to re-identify individuals. These data are collected through hand-held cameras, drones, and camera traps, and often come with biases in terms of sampling effort and distribution. In spite of these biases a common goal of collecting these datasets is to better understand the habitat use pattern of individuals and populations. Here, we examine the potential for multilevel binomial models to generate socio-spatial networks that capture the similarities in individual users across the spatial distribution of a species. We use this approach with 18 years of photo-ID data to better understand population structuring of beluga whales in the St. Lawrence River. We show using permuted and simulated data that this approach can identify community network structures within populations in a way that accounts for biases in collections methods. Applying this method to the entire 18 years dataset for SLE beluga, we found three spatially distinct clusters. These results suggest that within the population’s summer range individuals are moving within restricted areas (i.e., home ranges), and have implications for the estimated impacts of localized anthropogenic stressors, such as chemical pollution or acoustic disturbances on animal populations. We conclude that multilevel binomial models can be effective at estimating socio-spatial networks that describe habitat use patterns within wildlife populations.   
+
+### Get the observed data
+
+0.1 Load some libraries
+```{r}
+library(rgdal)
+library(ggplot2)
+library(raster)
+library(brms)
+library(dplyr)
+```
+
+
+## Multilevel multinomial model
+
+#### 2.1) completely random data 
+
+Retrieve and format the data for the multilevel multinomial model
+```{r randomized sector values}
+
+#get data where the sector associcated with a photoID has been randomly permuted
+df.mag.sec <- read.csv("../data/photoID_perm.csv")
+
+#for each individual count the number of times seen in each sector
+df.mag.sec <- df.mag.sec %>% mutate(sec_ID = paste0(sec,"_",ID) )
+df.mag.sec.multinom <- df.mag.sec %>% group_by(ID) %>% dplyr::summarize(y2=sum(sec==2),
+                                                                     y3=sum(sec==3),
+                                                                     y4=sum(sec==4),
+                                                                     y5=sum(sec==5),
+                                                                     y6=sum(sec==6),
+                                                                     y7=sum(sec==7),
+                                                                     y8=sum(sec==8),
+                                                                     y9=sum(sec==9),
+                                                                     y10=sum(sec==10),
+                                                                     y11=sum(sec==11),
+                                                                     y12=sum(sec==12),
+                                                                     y13=sum(sec==13),
+                                                                     y14=sum(sec==14),
+                                                                     y15=sum(sec==15))
+
+
+#for each individual count the total number of times seen
+df.mag.sec.multinom$size <- with(df.mag.sec.multinom, y2 + y3 + y4 + y5 + y6 + y7 + y8 + y9 + y10 + y11 + y12 + y13 + y14 + y15)
+
+#rename the dataframe
+df.random.multinom<-df.mag.sec.multinom
+
+```
+
+
+Fit the multilevel multinomial model
+```{r random model}
+
+#formula for each sector
+bf_2 <- bf(y2 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_3 <- bf(y3 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_4 <- bf(y4 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_5 <- bf(y5 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_6 <- bf(y6 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_7 <- bf(y7 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_8 <- bf(y8 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_9 <- bf(y9 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_10 <- bf(y10 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_11 <- bf(y11 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_12 <- bf(y12 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_13 <- bf(y13 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_14 <- bf(y14 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_15 <- bf(y15 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+
+#check prior choices
+get_prior(bf_2+bf_3+bf_4+bf_5+bf_6+bf_7+bf_8+bf_9+bf_10+bf_11+bf_12+bf_13+bf_14+bf_15 , data=df.random.multinom)
+
+#fit the model
+fit.int.random.binom <- brm(bf_2+bf_3+bf_4+bf_5+bf_6+bf_7+bf_8+bf_9+bf_10+bf_11+bf_12+bf_13+bf_14+bf_15, data=df.random.multinom, cores=4,chains=4, iter=2000, control = list(adapt_delta=0.95))
+
+
+summary(fit.int.random.binom)
+```
+
+
+Plot the results of the dependence between the sectors
+```{r vis random results}
+#get the labels for each sector number
+df.sec.numb<-read.csv("data/sec_id_name.csv")
+
+#
+#visualize results as a network
+#
+
+#Get summary table and reformat to an edgelist (e.g., to, from)
+fit.sum<-summary(fit.int.random.binom)
+df.sum<-as.data.frame(fit.sum$random$ID[-c(1:14),])
+rownames(df.sum)
+df.sum$temp <- stringr::str_remove(stringr::str_remove(substr(rownames(df.sum),5,nchar(rownames(df.sum))-1), "muy"),"_Intercept")
+df.sum$temp <- stringr::str_remove(stringr::str_remove(df.sum$temp, "muy"),"_Intercept")
+df.sum<-cbind(df.sum,stringr::str_split_fixed(df.sum$temp, n=2, pattern=","))
+df.sum$`1` <- stringr::str_remove(df.sum$`1`, "y")
+df.sum$`2` <- stringr::str_remove(df.sum$`2`, "y")
+colnames(df.sum)[9:10] <- c("from","to")
+colnames(df.sum)[1] <- c("weight")
+
+#create a network with edges that meet a given threshold requirement
+df.sum$weight <- ifelse( ((df.sum$`l-95% CI`>0 & df.sum$`u-95% CI`>0) | (df.sum$`l-95% CI`<0 & df.sum$`u-95% CI`<0)), df.sum$weight, NA  )
+graph.ranef<-igraph::graph_from_data_frame(dplyr::select(df.sum,from,to,weight ), directed=F)
+
+#add colors and labels to the network
+edge.col <- ifelse( E(graph.ranef)$weight>0,"green","red")
+df.vertex<-as.data.frame(as.numeric(as.character(V(graph.ranef)$name)))
+colnames(df.vertex)<-c("sec")
+df.join<-left_join(df.vertex,df.sec.numb, by="sec")
+node.label.out <- df.join$Secteur.de.la.position
+
+#get map (shapefile) of the st. lawrence esturary
+grid.area<-readOGR("../data/shapefile_sectors.shp")
+trueCentroids = gCentroid(grid.area,byid=TRUE, id=grid.area$SECTEUR)
+cent.sec<-as.data.frame(trueCentroids)
+cent.sec$Secteur.de.la.position <- rownames(cent.sec)
+node.latlong <-cent.sec
+
+#get the right order for the sectors
+node.latlong.join <- left_join(df.join,node.latlong, by="Secteur.de.la.position")
+
+#adjust the coords for BSM and SAG
+node.latlong.join[9,3] <- -69.976
+node.latlong.join[9,4] <- 48.249
+
+node.latlong.join[14,3] <- -69.778
+node.latlong.join[14,4] <- 48.144
+
+lo <- as.matrix(node.latlong.join[,3:4])
+
+#take a look (with map)
+par(mar = c(0, 0, 0, 0))
+plot(grid.area)
+plot(graph.ranef, edge.width=(abs(E(graph.ranef)$weight)*2), layout=lo, edge.color=edge.col, vertex.label = node.label.out, vertex.size= 12, rescale = FALSE, add=TRUE,vertex.label.cex=1)
+
+
+```
+
+
+
+
+## 2.2) Partially structured data
+
+Define 4 spatial communities
+```{r define groups}
+#empty list
+spatial_groups <- list()
+
+#create 4 spatial groups each with associated sectors (in numeric form, e.g., SAG == 15)
+spatial_groups[[1]] <- c(12,15,10)
+spatial_groups[[2]] <- c(7,8,9)
+spatial_groups[[3]] <- c(2,11,14)
+spatial_groups[[4]] <- c(3,13,12)
+
+#list of all sectors
+all_sect <- c(12,15,10,7,8,9,2,11,14,3,13)
+```
+
+Simulate some data
+```{r sim structured data}
+
+#get data where the sector associcated with a photoID has been randomly permuted
+df.mag.sec <- read.csv("data/photoID_perm.csv")
+
+#get all IDs
+x<-df.mag.sec$ID
+
+#get 4 groups of IDs
+split.values<-split(x, cut(x, quantile(x, prob = 0:4 / 4, names = FALSE), include = TRUE))
+
+#for each photoID assign the sector associated with that individuals group 80% of the time, otherwise choose a sector at random.
+for(i in 1:nrow(df.mag.sec)){
+  ran_sec <- 0
+  
+  if(df.mag.sec$ID[i]<max(split.values[[1]])){
+    ran_sec<-ifelse(runif(1)>0.2, sample(spatial_groups[[1]], size=1), sample(all_sect, size =1) )
+  }else if(df.mag.sec$ID[i]<max(split.values[[2]])){
+    ran_sec<-ifelse(runif(1)>0.2, sample(spatial_groups[[2]], size=1), sample(all_sect, size =1) )
+  }else if(df.mag.sec$ID[i]<max(split.values[[3]])){
+    ran_sec<-ifelse(runif(1)>0.2, sample(spatial_groups[[3]], size=1), sample(all_sect, size =1) )
+  }else {
+    ran_sec<-ifelse(runif(1)>0.2, sample(spatial_groups[[4]], size=1), sample(all_sect, size =1) )
+  }
+  
+  df.mag.sec$sec[i] <- ran_sec 
+  
+}
+
+#take a look
+table(df.mag.sec$sec)
+
+```
+
+
+2.1) test out parially structured data on the multilevel categorical model
+
+Get sector values for each NCT
+```{r sector values}
+
+#for each individual count the number of times seen in each sector
+df.mag.sec.multinom <- df.mag.sec %>% group_by(ID) %>% summarize(y2=sum(sec==2),
+                                                                     y3=sum(sec==3),
+                                                                     y7=sum(sec==7),
+                                                                     y8=sum(sec==8),
+                                                                     y9=sum(sec==9),
+                                                                     y10=sum(sec==10),
+                                                                     y11=sum(sec==11),
+                                                                     y12=sum(sec==12),
+                                                                     y13=sum(sec==13),
+                                                                     y14=sum(sec==14),
+                                                                     y15=sum(sec==15),
+                                                                     ID=ID[1])
+
+
+#for each individual count the total number of times seen
+df.mag.sec.multinom$size <- with(df.mag.sec.multinom, y2 + y3 + y7 + y8 + y9 + y10 + y11 + y12 + y13 + y14 + y15)
+
+#rename the dataframe
+df.structured.multinom<-df.mag.sec.multinom
+
+```
+
+Fit multinomial
+```{r structred model}
+
+#formula
+bf_2 <- bf(y2 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_3 <- bf(y3 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_4 <- bf(y4 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_5 <- bf(y5 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_6 <- bf(y6 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_7 <- bf(y7 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_8 <- bf(y8 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_9 <- bf(y9 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_10 <- bf(y10 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_11 <- bf(y11 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_12 <- bf(y12 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_13 <- bf(y13 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_14 <- bf(y14 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+bf_15 <- bf(y15 | trials(size) ~ 1 + (1|p|ID))+ binomial()
+
+#get priors
+get_prior(bf_2+bf_3+bf_7+bf_8+bf_9+bf_10+bf_11+bf_12+bf_13+bf_14+bf_15 , data=df.structured.multinom)
+
+#fit the model
+fit.int.structured.binom <- brm(bf_2+bf_3+bf_7+bf_8+bf_9+bf_10+bf_11+bf_12+bf_13+bf_14+bf_15, data=df.structured.multinom, cores=4,chains=4, iter=1000, control = list(adapt_delta=0.95)) # bf_4+bf_5+bf_6
+
+summary(fit.int.structured.binom)
+```
+
+
+Plot the results of the dependence between the sectors
+```{r viz structured results}
+#get the labels for each sector number
+df.sec.numb<-read.csv("data/sec_id_name.csv")
+
+#
+#visualize results as a network
+#
+
+#Get summary table and reformat to an edgelist (e.g., to, from)
+fit.sum<-summary(fit.int.structured.binom)
+df.sum<-as.data.frame(fit.sum$random$ID[-c(1:11),])
+rownames(df.sum)
+df.sum$temp <- stringr::str_remove(stringr::str_remove(substr(rownames(df.sum),5,nchar(rownames(df.sum))-1), "muy"),"_Intercept")
+df.sum$temp <- stringr::str_remove(stringr::str_remove(df.sum$temp, "muy"),"_Intercept")
+df.sum<-cbind(df.sum,stringr::str_split_fixed(df.sum$temp, n=2, pattern=","))
+df.sum$`1` <- stringr::str_remove(df.sum$`1`, "y")
+df.sum$`2` <- stringr::str_remove(df.sum$`2`, "y")
+colnames(df.sum)[9:10] <- c("from","to")
+colnames(df.sum)[1] <- c("weight")
+
+#create a network with edges that meet a given threshold requirement
+df.sum$weight <- ifelse( ((df.sum$`l-95% CI`>0 & df.sum$`u-95% CI`>0) | (df.sum$`l-95% CI`<0 & df.sum$`u-95% CI`<0)), df.sum$weight, NA  )
+graph.ranef<-igraph::graph_from_data_frame(dplyr::select(df.sum,from,to,weight ), directed=F)
+
+#add colors and labels to the network
+edge.col <- ifelse( E(graph.ranef)$weight>0,"green","red")
+df.vertex<-as.data.frame(as.numeric(as.character(V(graph.ranef)$name)))
+colnames(df.vertex)<-c("sec")
+df.join<-left_join(df.vertex,df.sec.numb, by="sec")
+node.label.out <- df.join$Secteur.de.la.position
+
+#get map (shapefile) of the st. lawrence esturary
+grid.area<-readOGR("data/shapefile_sectors.shp")
+trueCentroids = gCentroid(grid.area,byid=TRUE, id=grid.area$SECTEUR)
+cent.sec<-as.data.frame(trueCentroids)
+cent.sec$Secteur.de.la.position <- rownames(cent.sec)
+node.latlong <-cent.sec
+
+#get the right order for the sectors
+node.latlong.join <- left_join(df.join,node.latlong, by="Secteur.de.la.position")
+
+#adjust the coords for BSM and SAG
+node.latlong.join[6,3] <- -69.976
+node.latlong.join[6,4] <- 48.249
+
+node.latlong.join[11,3] <- -69.778
+node.latlong.join[11,4] <- 48.144
+
+lo <- as.matrix(node.latlong.join[,3:4])
+
+#take a look (with map)
+par(mar = c(0, 0, 0, 0))
+plot(grid.area)
+plot(graph.ranef, edge.width=(abs(E(graph.ranef)$weight)*2), layout=lo, edge.color=edge.col, vertex.label = node.label.out, vertex.size= 12, rescale = FALSE, add=TRUE,vertex.label.cex=1)
+
+
+```
+
+
+
