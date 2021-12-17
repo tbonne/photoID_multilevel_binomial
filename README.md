@@ -1,17 +1,23 @@
-# Extracting socio-spatial networks from photo-ID data using multilevel multinomial models
+﻿# Extracting spatial networks from capture-recapture data reveal individual site fidelity patterns within a marine mammal’s spatial range
 <br>
 
-### Abstract: 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Photo identification of individuals within a population is a common data source that is becoming more common given technological advances and the use of computer vision and machine learning to re-identify individuals. These data are collected through hand-held cameras, drones, and camera traps, and often come with biases in terms of sampling effort and distribution. In spite of these biases a common goal of collecting these datasets is to better understand the habitat use pattern of individuals and populations. Here, we examine the potential for multilevel multinomial models to generate socio-spatial networks that capture the similarities in individual users across the spatial distribution of a species. We use this approach with 18 years of photo-ID data to better understand population structuring of beluga whales in the St. Lawrence River. We show using permuted and simulated data that this approach can identify community network structures within populations in a way that accounts for biases in collections methods. Applying this method to the entire 18 years dataset for SLE beluga, we found three spatially distinct communities. These results suggest that within the population’s summer range individuals are moving within restricted areas (i.e., home ranges), and have implications for the estimated impacts of localized anthropogenic stressors, such as chemical pollution or acoustic disturbances on animal populations. We conclude that multilevel multinomial models can be effective at estimating socio-spatial networks that describe community structuring within wildlife populations. 
+### Abstract: <br>
+1.	Estimating the impacts of anthropogenic disturbances requires an understanding of the habitat use patterns of individuals within a population. This is especially the case when disturbances are localized within a population’s spatial range, as variation in habitat-use within a population can drastically alter the distribution of impacts. <br>
+2.	Here, we illustrate the potential for multilevel binomial models to generate spatial networks from capture-recapture data, a common data source use in wildlife studies to monitor population dynamics and habitat use. These spatial networks capture which regions of a population’s spatial distribution share similar/dissimilar individual usage patterns, and can be especially useful for detecting structured habitat use within the population’s spatial range.<br>
+3.	Using simulations and 18 years of capture-recapture data from St. Lawrence Estuary (SLE) beluga, we show that this approach can successfully estimate the magnitude of similarities/dissimilarities in individual usage patterns across sectors, and identify sectors that share similar individual usage patterns that differ from other sectors, i.e., structured habitat use. In the case of SLE beluga, this method identified multiple clusters of individuals, each preferentially using restricted areas within their summer range of the SLE. <br>
+4.	Multilevel binomial models can be effective at estimating spatial structure in habitat use within wildlife populations sampled by capture-recapture of individuals, and can be especially useful when sampling effort is not evenly distributed. Our finding of a structured habitat use within the SLE beluga summer range has direct implications for estimating individual exposures to localized stressors, such as underwater noise from shipping or other activities.<br>
+ 
+<br>
 <br>
  
 ### Code:
 
- In this paper we used brms to build and run a multilevel multinomial model to create socio-spatial networks. See [this link](https://github.com/tbonne/photoID_multinomial/blob/main/R/multinomial_code.Rmd) for more detailed code, but below is the general formula used:
+ In this paper we used brms to build and run multilevel binomial models to create socio-spatial networks. See [this link](https://github.com/tbonne/photoID_multilevel_binomial/blob/main/R/multilevel_binomial_models.Rmd) for more detailed code, but below is the general formula used:
  
-  bf(y | trials(totsize) ~ 1 + (1|p|ID)) + multinomial()
+  bf(sector1 | trials(n) ~ 1 + (1|q|ID)) + bf(sector2 | trials(n) ~ 1 + (1|q|ID)) + binomial()
   
- Here 'y' is a column vector with the number of times a beluga was seen in each sector of the St. Lawrence Estuary. 'Totsize' is the total number of times that beluga was seen, and 'ID' is the individual beluga ID number. The additional 'p' in the random effects formula (1|p|ID) allows correlations between individual random intercepts (i.e., beluga usage patterns) to be calculated between sectors.
+ Here, sector1 indicates how many times each individual was seen in sector1. While n is the total number of times an individual was captured photographically. Finally, q represents an arbitrary character choice that allows correlations between the estimates of random intercepts for each sector.
+
 <br>
  
 ### Visualizations:
@@ -26,4 +32,4 @@
  
  ![](inst/figs/Spatial_comm_net.png)
 
-*Figure 4: Similarity and dissimilarity between sectors in the beluga whale population of the St. Lawrence. The green edges between two sectors signify that the sectors share high/low users, while red edges signify that they have dissimilar high/low users. The lack of an edge signifies that the high/low users of one sector does not provide information about the high/low users of other sectors. Nodes represent sectors, and are coloured based on shared communities: i.e., shared green edges, and no red edges. Node sizes represent the magnitudes of individual differences in use within the sector, i.e., larger nodes suggest larger differences between high and low users.*
+*Figure 4: Similarity and dissimilarity between sectors in the beluga whale population of the St. Lawrence. The green edges between two sectors signify that the sectors share high/low users, while red edges signify that they have dissimilar high/low users. The lack of an edge signifies that the high/low users of one sector does not provide information about the high/low users of other sectors. Nodes represent sectors, and are coloured based on shared network communities: i.e., shared green edges, and no red edges. Node sizes represent the magnitudes of individual differences in use within the sector, i.e., larger nodes suggest larger differences between high and low users.*

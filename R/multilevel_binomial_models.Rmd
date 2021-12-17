@@ -16,6 +16,8 @@ library(ggplot2)
 library(raster)
 library(brms)
 library(dplyr)
+library(igraph)
+library(rgeos)
 ```
 
 
@@ -89,7 +91,7 @@ summary(fit.int.random.binom)
 Plot the results of the dependence between the sectors
 ```{r vis random results}
 #get the labels for each sector number
-df.sec.numb<-read.csv("data/sec_id_name.csv")
+df.sec.numb<-read.csv("../data/sec_id_name.csv")
 
 #
 #visualize results as a network
