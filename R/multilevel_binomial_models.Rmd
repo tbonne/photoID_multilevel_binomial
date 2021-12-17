@@ -21,11 +21,11 @@ library(rgeos)
 ```
 
 
-## Multilevel multinomial model
+## Multilevel binomial models
 
 #### 2.1) completely random data 
 
-Retrieve and format the data for the multilevel multinomial model
+Retrieve and format the data for the multilevel binomial model
 ```{r randomized sector values}
 
 #get data where the sector associcated with a photoID has been randomly permuted
@@ -171,7 +171,7 @@ Simulate some data
 ```{r sim structured data}
 
 #get data where the sector associcated with a photoID has been randomly permuted
-df.mag.sec <- read.csv("data/photoID_perm.csv")
+df.mag.sec <- read.csv("../data/photoID_perm.csv")
 
 #get all IDs
 x<-df.mag.sec$ID
@@ -203,7 +203,7 @@ table(df.mag.sec$sec)
 ```
 
 
-2.1) test out parially structured data on the multilevel categorical model
+2.1) test out parially structured data on the multilevel binomial model
 
 Get sector values for each NCT
 ```{r sector values}
@@ -254,7 +254,7 @@ bf_15 <- bf(y15 | trials(size) ~ 1 + (1|p|ID))+ binomial()
 get_prior(bf_2+bf_3+bf_7+bf_8+bf_9+bf_10+bf_11+bf_12+bf_13+bf_14+bf_15 , data=df.structured.multinom)
 
 #fit the model
-fit.int.structured.binom <- brm(bf_2+bf_3+bf_7+bf_8+bf_9+bf_10+bf_11+bf_12+bf_13+bf_14+bf_15, data=df.structured.multinom, cores=4,chains=4, iter=1000, control = list(adapt_delta=0.95)) # bf_4+bf_5+bf_6
+fit.int.structured.binom <- brm(bf_2+bf_3+bf_7+bf_8+bf_9+bf_10+bf_11+bf_12+bf_13+bf_14+bf_15, data=df.structured.multinom, cores=4,chains=4, iter=2000, control = list(adapt_delta=0.95)) # bf_4+bf_5+bf_6
 
 summary(fit.int.structured.binom)
 ```
@@ -263,7 +263,7 @@ summary(fit.int.structured.binom)
 Plot the results of the dependence between the sectors
 ```{r viz structured results}
 #get the labels for each sector number
-df.sec.numb<-read.csv("data/sec_id_name.csv")
+df.sec.numb<-read.csv("../data/sec_id_name.csv")
 
 #
 #visualize results as a network
@@ -293,7 +293,7 @@ df.join<-left_join(df.vertex,df.sec.numb, by="sec")
 node.label.out <- df.join$Secteur.de.la.position
 
 #get map (shapefile) of the st. lawrence esturary
-grid.area<-readOGR("data/shapefile_sectors.shp")
+grid.area<-readOGR("../data/shapefile_sectors.shp")
 trueCentroids = gCentroid(grid.area,byid=TRUE, id=grid.area$SECTEUR)
 cent.sec<-as.data.frame(trueCentroids)
 cent.sec$Secteur.de.la.position <- rownames(cent.sec)
